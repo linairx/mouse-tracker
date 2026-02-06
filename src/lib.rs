@@ -1,4 +1,8 @@
 pub mod app;
+pub mod types;
+
+#[cfg(feature = "ssr")]
+pub mod mouse_handler;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

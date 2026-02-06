@@ -1,5 +1,5 @@
 [package]
-name = "{{project-name}}"
+name = "mouse-tracker"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,20 +7,27 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-leptos = { version = "0.8.0"{% if nightly == "Yes" %}, features = ["nightly"]{% endif %} }
-leptos_router = { version = "0.8.0"{% if nightly == "Yes" %}, features = ["nightly"]{% endif %} }
-axum = { version = "0.8.0", optional = true }
+leptos = { version = "0.8.0" }
+leptos_router = { version = "0.8.0" }
+axum = { version = "0.8.0", optional = true, features = ["macros"] }
 console_error_panic_hook = { version = "0.1", optional = true }
 leptos_axum = { version = "0.8.0", optional = true }
 leptos_meta = { version = "0.8.0" }
 tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
 wasm-bindgen = { version = "0.2.106", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+web-sys = { version = "0.3", features = ["MouseEvent", "WheelEvent", "InputEvent", "Request", "RequestInit", "RequestMode", "Headers", "Response"] }
 
 [features]
 hydrate = [
     "leptos/hydrate",
     "dep:console_error_panic_hook",
     "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:js-sys",
 ]
 ssr = [
     "dep:axum",
@@ -41,7 +48,7 @@ panic = "abort"
 
 [package.metadata.leptos]
 # The name used by wasm-bindgen/cargo-leptos for the JS/WASM bundle. Defaults to the crate name
-output-name = "{{project-name}}"
+output-name = "mouse-tracker"
 
 # The site root folder is where cargo-leptos generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site-root = "target/site"
