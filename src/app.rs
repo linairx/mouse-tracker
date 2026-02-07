@@ -15,7 +15,16 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
 #[cfg(feature = "hydrate")]
-use web_sys::{Request, RequestInit, RequestMode, Headers, Response};
+use web_sys::{Request, RequestInit, RequestMode, Headers, Response, EventTarget, HtmlElement, KeyboardEvent};
+
+#[cfg(feature = "hydrate")]
+use std::cell::RefCell;
+#[cfg(feature = "hydrate")]
+use std::rc::Rc;
+#[cfg(feature = "hydrate")]
+use js_sys::Function;
+#[cfg(feature = "hydrate")]
+use std::collections;
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
@@ -65,92 +74,276 @@ fn HomePage() -> impl IntoView {
     let event_count = RwSignal::new(0u32);
 
     #[cfg(feature = "hydrate")]
-    let (event_buffer, debounced_send) = create_debounced_sender();
+    let (event_buffer, debounced_send, tracking_state) = create_tracking_system();
+
+    // 为每个事件处理器创建克隆的引用
+    #[cfg(feature = "hydrate")]
+    let buffer_mv = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_mv = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_mv = tracking_state.clone();
 
     #[cfg(feature = "hydrate")]
-    let buffer1 = event_buffer.clone();
+    let buffer_md = event_buffer.clone();
     #[cfg(feature = "hydrate")]
-    let sender1 = debounced_send.clone();
+    let sender_md = debounced_send.clone();
     #[cfg(feature = "hydrate")]
-    let buffer2 = event_buffer.clone();
+    let state_md = tracking_state.clone();
+
     #[cfg(feature = "hydrate")]
-    let sender2 = debounced_send.clone();
+    let buffer_mu = event_buffer.clone();
     #[cfg(feature = "hydrate")]
-    let buffer3 = event_buffer.clone();
+    let sender_mu = debounced_send.clone();
     #[cfg(feature = "hydrate")]
-    let sender3 = debounced_send.clone();
+    let state_mu = tracking_state.clone();
     #[cfg(feature = "hydrate")]
-    let buffer4 = event_buffer.clone();
+    let state_wh = tracking_state.clone();
+
     #[cfg(feature = "hydrate")]
-    let sender4 = debounced_send.clone();
+    let buffer_wh = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_wh = debounced_send.clone();
+
+    #[cfg(feature = "hydrate")]
+    let buffer_ds = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_ds = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_ds = tracking_state.clone();
+
+    #[cfg(feature = "hydrate")]
+    let buffer_d = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_d = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_d = tracking_state.clone();
+
+    #[cfg(feature = "hydrate")]
+    let buffer_de = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_de = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_de = tracking_state.clone();
+
+    #[cfg(feature = "hydrate")]
+    let buffer_kd = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_kd = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_kd = tracking_state.clone();
+
+    #[cfg(feature = "hydrate")]
+    let buffer_ku = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender_ku = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let state_ku = tracking_state.clone();
 
     view! {
         <div style="padding: 20px;">
-            <h1>"Mouse Tracker Demo"</h1>
-            <p>"移动鼠标或点击以记录事件"</p>
+            <h1>"Mouse Tracker Demo - IL Training Data"</h1>
+            <p>"移动鼠标、点击、拖拽、按键以记录交互事件"</p>
             <p>"已记录事件数: " {event_count}</p>
+            <p>"会话 ID: " {move || {
+                #[cfg(feature = "hydrate")]
+                return tracking_state.session_id.clone();
+                #[cfg(not(feature = "hydrate"))]
+                return "N/A".to_string();
+            }}</p>
 
+            // 全局键盘事件监听
             <div
-                style="width: 100%; height: 400px; background: #f0f0f0; border: 2px solid #ccc;"
-                on:mousemove=move |_e| {
+                style="width: 100%; height: 500px; background: #f0f0f0; border: 2px solid #ccc; position: relative; user-select: none;"
+                tabindex="0"
+                on:mousemove=move |e| {
                     event_count.update(|n| *n += 1);
                     #[cfg(feature = "hydrate")]
-                    queue_event("mousemove", _e.client_x(), _e.client_y(), None, &buffer1, &sender1);
+                    {
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("buttons".to_string(), e.buttons().to_string());
+
+                        let mouse_event = create_mouse_event("mousemove", e.client_x(), e.client_y(), &state_mv, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_mv, &sender_mv);
+                    }
                 }
                 on:mousedown=move |e| {
                     event_count.update(|n| *n += 1);
-                    let _button = match e.button() {
-                        0 => "left",
-                        1 => "middle",
-                        2 => "right",
-                        _ => "unknown",
-                    };
                     #[cfg(feature = "hydrate")]
-                    queue_event("mousedown", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())), &buffer2, &sender2);
+                    {
+                        let button = match e.button() {
+                            0 => "left",
+                            1 => "middle",
+                            2 => "right",
+                            _ => "unknown",
+                        };
+
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("button".to_string(), button.to_string());
+                        extra.insert("buttons".to_string(), e.buttons().to_string());
+
+                        let mouse_event = create_mouse_event("mousedown", e.client_x(), e.client_y(), &state_md, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_md, &sender_md);
+                    }
                 }
                 on:mouseup=move |e| {
                     event_count.update(|n| *n += 1);
-                    let _button = match e.button() {
-                        0 => "left",
-                        1 => "middle",
-                        2 => "right",
-                        _ => "unknown",
-                    };
                     #[cfg(feature = "hydrate")]
-                    queue_event("mouseup", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())), &buffer3, &sender3);
+                    {
+                        let button = match e.button() {
+                            0 => "left",
+                            1 => "middle",
+                            2 => "right",
+                            _ => "unknown",
+                        };
+
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("button".to_string(), button.to_string());
+                        extra.insert("buttons".to_string(), e.buttons().to_string());
+
+                        let mouse_event = create_mouse_event("mouseup", e.client_x(), e.client_y(), &state_mu, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_mu, &sender_mu);
+                    }
                 }
                 on:wheel=move |e| {
                     event_count.update(|n| *n += 1);
-                    let _scroll_y = e.delta_y().to_string();
                     #[cfg(feature = "hydrate")]
-                    queue_event("wheel", e.client_x(), e.client_y(), Some(("scroll_y".to_string(), _scroll_y)), &buffer4, &sender4);
+                    {
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("scroll_y".to_string(), e.delta_y().to_string());
+                        extra.insert("scroll_x".to_string(), e.delta_x().to_string());
+
+                        let mouse_event = create_mouse_event("wheel", e.client_x(), e.client_y(), &state_wh, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_wh, &sender_wh);
+                    }
+                }
+                on:dragstart=move |e| {
+                    event_count.update(|n| *n += 1);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let mouse_event = create_mouse_event("dragstart", e.client_x(), e.client_y(), &state_ds, None, &e);
+
+                        // 记录拖拽开始事件 ID
+                        *state_ds.drag_state.borrow_mut() = Some(mouse_event.event_id.clone());
+
+                        queue_enriched_event(mouse_event, &buffer_ds, &sender_ds);
+                    }
+                }
+                on:drag=move |e| {
+                    event_count.update(|n| *n += 1);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let mouse_event = create_mouse_event("drag", e.client_x(), e.client_y(), &state_d, None, &e);
+                        queue_enriched_event(mouse_event, &buffer_d, &sender_d);
+                    }
+                }
+                on:dragend=move |e| {
+                    event_count.update(|n| *n += 1);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let mouse_event = create_mouse_event("dragend", e.client_x(), e.client_y(), &state_de, None, &e);
+
+                        // 清除拖拽状态
+                        *state_de.drag_state.borrow_mut() = None;
+
+                        queue_enriched_event(mouse_event, &buffer_de, &sender_de);
+                    }
+                }
+                on:keydown=move |e| {
+                    event_count.update(|n| *n += 1);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let keyboard_evt = e.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("key".to_string(), keyboard_evt.key());
+                        extra.insert("code".to_string(), keyboard_evt.code());
+                        extra.insert("ctrl_key".to_string(), keyboard_evt.ctrl_key().to_string());
+                        extra.insert("shift_key".to_string(), keyboard_evt.shift_key().to_string());
+                        extra.insert("alt_key".to_string(), keyboard_evt.alt_key().to_string());
+                        extra.insert("meta_key".to_string(), keyboard_evt.meta_key().to_string());
+
+                        let mouse_event = create_mouse_event("keydown", 0, 0, &state_kd, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_kd, &sender_kd);
+                    }
+                }
+                on:keyup=move |e| {
+                    event_count.update(|n| *n += 1);
+                    #[cfg(feature = "hydrate")]
+                    {
+                        let keyboard_evt = e.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
+                        let mut extra = std::collections::HashMap::new();
+                        extra.insert("key".to_string(), keyboard_evt.key());
+                        extra.insert("code".to_string(), keyboard_evt.code());
+                        extra.insert("ctrl_key".to_string(), keyboard_evt.ctrl_key().to_string());
+                        extra.insert("shift_key".to_string(), keyboard_evt.shift_key().to_string());
+                        extra.insert("alt_key".to_string(), keyboard_evt.alt_key().to_string());
+                        extra.insert("meta_key".to_string(), keyboard_evt.meta_key().to_string());
+
+                        let mouse_event = create_mouse_event("keyup", 0, 0, &state_ku, Some(extra), &e);
+                        queue_enriched_event(mouse_event, &buffer_ku, &sender_ku);
+                    }
                 }
             >
                 <p style="padding: 20px; text-align: center; color: #666;">
-                    "在此区域内移动鼠标、点击或滚动"
+                    "在此区域内移动鼠标、点击、拖拽或按键"
                 </p>
+                <div
+                    style="width: 100px; height: 100px; background: #4CAF50; color: white; display: flex; align-items: center; justify-content: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); cursor: move;"
+                    draggable="true"
+                >
+                    "拖拽我!"
+                </div>
             </div>
 
             <p style="margin-top: 20px; font-size: 14px; color: #666;">
                 "事件将保存到服务器上的 mouse_events.jsonl 文件"
             </p>
+            <p style="font-size: 12px; color: #999;">
+                "支持的事件: mousemove, mousedown, mouseup, wheel, dragstart, drag, dragend, keydown, keyup"
+            </p>
         </div>
     }
 }
 
-#[cfg(feature = "hydrate")]
-use std::cell::RefCell;
-#[cfg(feature = "hydrate")]
-use std::rc::Rc;
-#[cfg(feature = "hydrate")]
-use js_sys::Function;
+// ============================================================================
+// IL 训练数据收集 - 会话和事件管理
+// ============================================================================
 
-/// 创建防抖发送器
-/// 返回：(事件缓冲区, 防抖发送函数)
 #[cfg(feature = "hydrate")]
-fn create_debounced_sender() -> (Rc<RefCell<Vec<MouseEvent>>>, Rc<impl Fn()>) {
+#[derive(Clone)]
+pub struct TrackingState {
+    pub session_id: String,
+    pub event_counter: Rc<RefCell<u64>>,
+    pub last_event: Rc<RefCell<Option<(MouseEvent, f64)>>>, // (上一次事件, 上一次时间戳)
+    pub drag_state: Rc<RefCell<Option<String>>>, // 当前拖拽的事件 ID
+}
+
+#[cfg(feature = "hydrate")]
+impl TrackingState {
+    pub fn new() -> Self {
+        let session_id = format!("session_{}", js_sys::Date::now());
+        Self {
+            session_id,
+            event_counter: Rc::new(RefCell::new(0)),
+            last_event: Rc::new(RefCell::new(None)),
+            drag_state: Rc::new(RefCell::new(None)),
+        }
+    }
+
+    pub fn generate_event_id(&self) -> String {
+        let count = *self.event_counter.borrow();
+        *self.event_counter.borrow_mut() += 1;
+        format!("event_{}_{}", self.session_id, count)
+    }
+}
+
+/// 创建防抖发送器和追踪状态
+/// 返回：(事件缓冲区, 防抖发送函数, 追踪状态)
+#[cfg(feature = "hydrate")]
+fn create_tracking_system() -> (Rc<RefCell<Vec<MouseEvent>>>, Rc<impl Fn()>, TrackingState) {
     let event_buffer = Rc::new(RefCell::new(Vec::new()));
     let timeout_handle = Rc::new(RefCell::new(None::<i32>));
+    let tracking_state = TrackingState::new();
 
     let buffer_clone = event_buffer.clone();
     let handle_clone = timeout_handle.clone();
@@ -168,7 +361,6 @@ fn create_debounced_sender() -> (Rc<RefCell<Vec<MouseEvent>>>, Rc<impl Fn()>) {
         let window = web_sys::window().expect("Window not available");
 
         let callback = Closure::wrap(Box::new(move || {
-            // 发送缓冲区中的所有事件
             let events = buffer.borrow_mut().drain(..).collect::<Vec<_>>();
 
             if !events.is_empty() {
@@ -182,55 +374,180 @@ fn create_debounced_sender() -> (Rc<RefCell<Vec<MouseEvent>>>, Rc<impl Fn()>) {
             }
         }) as Box<dyn FnMut()>);
 
-        // 将 Closure 转换为 Function
         let callback_ptr = callback.as_ref().dyn_ref::<Function>().unwrap();
         let timeout_id = window.set_timeout_with_callback_and_timeout_and_arguments_0(
             callback_ptr,
             500,
         ).expect("Failed to set timeout");
 
-        // 忘记 Closure 以保持其存活（直到定时器触发）
         callback.forget();
-
         *handle.borrow_mut() = Some(timeout_id);
     };
 
-    (event_buffer, Rc::new(debounced_send))
+    (event_buffer, Rc::new(debounced_send), tracking_state)
+}
+
+/// 获取目标元素信息
+#[cfg(feature = "hydrate")]
+fn get_target_info(event: &web_sys::Event) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+    let target = event.target();
+    let mut tag_name = None;
+    let mut id = None;
+    let mut class_name = None;
+    let mut text = None;
+
+    if let Some(target) = target {
+        if let Some(element) = target.dyn_ref::<web_sys::Element>() {
+            tag_name = Some(element.tag_name().to_lowercase());
+            id = element.get_attribute("id");
+            class_name = element.get_attribute("class");
+
+            // 获取文本内容（限制长度）
+            if let Some(html_element) = element.dyn_ref::<web_sys::HtmlElement>() {
+                let txt = html_element.inner_text();
+                if txt.len() > 50 {
+                    text = Some(format!("{}...", &txt[..50]));
+                } else if !txt.is_empty() {
+                    text = Some(txt);
+                }
+            }
+        }
+    }
+
+    (tag_name, id, class_name, text)
+}
+
+/// 计算速度和距离
+#[cfg(feature = "hydrate")]
+fn calculate_velocity_and_distance(
+    last_event: &Option<(MouseEvent, f64)>,
+    current_x: i32,
+    current_y: i32,
+    current_time: f64,
+) -> (Option<f64>, Option<f64>, Option<f64>) {
+    if let Some((last, last_time)) = last_event {
+        let dx = (current_x - last.x) as f64;
+        let dy = (current_y - last.y) as f64;
+        let dt = current_time - last_time;
+
+        if dt > 0.0 {
+            let distance = (dx * dx + dy * dy).sqrt();
+            let velocity_x = dx / dt;
+            let velocity_y = dy / dt;
+
+            return (Some(velocity_x), Some(velocity_y), Some(distance));
+        }
+    }
+
+    (None, None, None)
+}
+
+/// 创建完整的事件对象
+#[cfg(feature = "hydrate")]
+fn create_mouse_event(
+    event_type: &str,
+    x: i32,
+    y: i32,
+    tracking_state: &TrackingState,
+    extra: Option<std::collections::HashMap<String, String>>,
+    event: &web_sys::Event,
+) -> MouseEvent {
+    let timestamp = js_sys::Date::now();
+    let current_time = timestamp as f64;
+
+    // 生成事件 ID
+    let event_id = tracking_state.generate_event_id();
+
+    // 获取目标元素信息
+    let (target_tag, target_id, target_class, target_text) = get_target_info(event);
+
+    // 计算速度和距离
+    let (vel_x, vel_y, dist) = calculate_velocity_and_distance(
+        &tracking_state.last_event.borrow(),
+        x,
+        y,
+        current_time,
+    );
+
+    // 获取视口信息
+    let window = web_sys::window().expect("Window not available");
+    let viewport_width = Some(window.inner_width().unwrap().as_f64().unwrap() as u32);
+    let viewport_height = Some(window.inner_height().unwrap().as_f64().unwrap() as u32);
+
+    // 处理额外信息
+    let mut button = None;
+    let mut buttons = None;
+    let mut scroll_y = None;
+    let mut scroll_x = None;
+    let mut key = None;
+    let mut code = None;
+    let mut ctrl_key = None;
+    let mut shift_key = None;
+    let mut alt_key = None;
+    let mut meta_key = None;
+
+    if let Some(extra) = extra {
+        if let Some(v) = extra.get("button") { button = Some(v.clone()); }
+        if let Some(v) = extra.get("buttons") { buttons = v.parse::<u16>().ok(); }
+        if let Some(v) = extra.get("scroll_y") { scroll_y = v.parse::<f64>().ok(); }
+        if let Some(v) = extra.get("scroll_x") { scroll_x = v.parse::<f64>().ok(); }
+        if let Some(v) = extra.get("key") { key = Some(v.clone()); }
+        if let Some(v) = extra.get("code") { code = Some(v.clone()); }
+        if let Some(v) = extra.get("ctrl_key") { ctrl_key = v.parse::<bool>().ok(); }
+        if let Some(v) = extra.get("shift_key") { shift_key = v.parse::<bool>().ok(); }
+        if let Some(v) = extra.get("alt_key") { alt_key = v.parse::<bool>().ok(); }
+        if let Some(v) = extra.get("meta_key") { meta_key = v.parse::<bool>().ok(); }
+    }
+
+    let mouse_event = MouseEvent {
+        event_type: event_type.to_string(),
+        timestamp: timestamp as u64,
+        x,
+        y,
+        screen_x: Some(x),  // 简化处理，使用 client_x/y
+        screen_y: Some(y),
+        page_x: Some(x),
+        page_y: Some(y),
+        button,
+        buttons,
+        scroll_y,
+        scroll_x,
+        target: None,
+        target_tag,
+        target_id,
+        target_class,
+        target_text,
+        session_id: tracking_state.session_id.clone(),
+        event_id: event_id.clone(),
+        parent_event_id: tracking_state.drag_state.borrow().clone(),
+        velocity_x: vel_x,
+        velocity_y: vel_y,
+        distance: dist,
+        key,
+        code,
+        ctrl_key,
+        shift_key,
+        alt_key,
+        meta_key,
+        viewport_width,
+        viewport_height,
+        metadata: None,
+    };
+
+    // 更新上一个事件
+    *tracking_state.last_event.borrow_mut() = Some((mouse_event.clone(), current_time));
+
+    mouse_event
 }
 
 /// 将事件添加到缓冲区并触发防抖
 #[cfg(feature = "hydrate")]
-fn queue_event(
-    event_type: &str,
-    x: i32,
-    y: i32,
-    extra: Option<(String, String)>,
+fn queue_enriched_event(
+    mouse_event: MouseEvent,
     buffer: &Rc<RefCell<Vec<MouseEvent>>>,
     debounced_send: &Rc<impl Fn()>,
 ) {
-    let timestamp = js_sys::Date::now() as u64;
-    let mut mouse_event = MouseEvent {
-        event_type: event_type.to_string(),
-        x,
-        y,
-        timestamp,
-        target: None,
-        button: None,
-        scroll_y: None,
-    };
-
-    if let Some((key, value)) = extra {
-        match key.as_str() {
-            "button" => mouse_event.button = Some(value),
-            "scroll_y" => mouse_event.scroll_y = value.parse().ok(),
-            _ => {}
-        }
-    }
-
-    // 添加到缓冲区
     buffer.borrow_mut().push(mouse_event);
-
-    // 触发防抖
     debounced_send();
 }
 
