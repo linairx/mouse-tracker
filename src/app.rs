@@ -405,8 +405,10 @@ fn get_target_info(event: &web_sys::Event) -> (Option<String>, Option<String>, O
             // 获取文本内容（限制长度）
             if let Some(html_element) = element.dyn_ref::<web_sys::HtmlElement>() {
                 let txt = html_element.inner_text();
-                if txt.len() > 50 {
-                    text = Some(format!("{}...", &txt[..50]));
+                // 按字符而非字节截断，避免在中文字符中间切分
+                let truncated: String = txt.chars().take(50).collect();
+                if txt.chars().count() > 50 {
+                    text = Some(format!("{}...", truncated));
                 } else if !txt.is_empty() {
                     text = Some(txt);
                 }
@@ -461,9 +463,12 @@ fn create_mouse_event(
     // 获取目标元素信息
     let (target_tag, target_id, target_class, target_text) = get_target_info(event);
 
+    // 安全地获取上一个事件数据（使用 try_borrow 避免冲突）
+    let last_event_data = tracking_state.last_event.try_borrow().ok().and_then(|b| b.as_ref().cloned());
+
     // 计算速度和距离
     let (vel_x, vel_y, dist) = calculate_velocity_and_distance(
-        &tracking_state.last_event.borrow(),
+        &last_event_data,
         x,
         y,
         current_time,
@@ -473,6 +478,9 @@ fn create_mouse_event(
     let window = web_sys::window().expect("Window not available");
     let viewport_width = Some(window.inner_width().unwrap().as_f64().unwrap() as u32);
     let viewport_height = Some(window.inner_height().unwrap().as_f64().unwrap() as u32);
+
+    // 安全地获取拖拽状态
+    let parent_event_id = tracking_state.drag_state.try_borrow().ok().and_then(|b| b.as_ref().cloned());
 
     // 处理额外信息
     let mut button = None;
@@ -519,7 +527,7 @@ fn create_mouse_event(
         target_text,
         session_id: tracking_state.session_id.clone(),
         event_id: event_id.clone(),
-        parent_event_id: tracking_state.drag_state.borrow().clone(),
+        parent_event_id,
         velocity_x: vel_x,
         velocity_y: vel_y,
         distance: dist,
@@ -534,8 +542,10 @@ fn create_mouse_event(
         metadata: None,
     };
 
-    // 更新上一个事件
-    *tracking_state.last_event.borrow_mut() = Some((mouse_event.clone(), current_time));
+    // 尝试更新上一个事件（如果借用失败则跳过）
+    if let Ok(mut last) = tracking_state.last_event.try_borrow_mut() {
+        *last = Some((mouse_event.clone(), current_time));
+    }
 
     mouse_event
 }
