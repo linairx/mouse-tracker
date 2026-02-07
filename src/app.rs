@@ -64,6 +64,26 @@ pub fn App() -> impl IntoView {
 fn HomePage() -> impl IntoView {
     let event_count = RwSignal::new(0u32);
 
+    #[cfg(feature = "hydrate")]
+    let (event_buffer, debounced_send) = create_debounced_sender();
+
+    #[cfg(feature = "hydrate")]
+    let buffer1 = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender1 = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let buffer2 = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender2 = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let buffer3 = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender3 = debounced_send.clone();
+    #[cfg(feature = "hydrate")]
+    let buffer4 = event_buffer.clone();
+    #[cfg(feature = "hydrate")]
+    let sender4 = debounced_send.clone();
+
     view! {
         <div style="padding: 20px;">
             <h1>"Mouse Tracker Demo"</h1>
@@ -75,7 +95,7 @@ fn HomePage() -> impl IntoView {
                 on:mousemove=move |_e| {
                     event_count.update(|n| *n += 1);
                     #[cfg(feature = "hydrate")]
-                    send_event("mousemove", _e.client_x(), _e.client_y(), None);
+                    queue_event("mousemove", _e.client_x(), _e.client_y(), None, &buffer1, &sender1);
                 }
                 on:mousedown=move |e| {
                     event_count.update(|n| *n += 1);
@@ -86,7 +106,7 @@ fn HomePage() -> impl IntoView {
                         _ => "unknown",
                     };
                     #[cfg(feature = "hydrate")]
-                    send_event("mousedown", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())));
+                    queue_event("mousedown", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())), &buffer2, &sender2);
                 }
                 on:mouseup=move |e| {
                     event_count.update(|n| *n += 1);
@@ -97,13 +117,13 @@ fn HomePage() -> impl IntoView {
                         _ => "unknown",
                     };
                     #[cfg(feature = "hydrate")]
-                    send_event("mouseup", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())));
+                    queue_event("mouseup", e.client_x(), e.client_y(), Some(("button".to_string(), _button.to_string())), &buffer3, &sender3);
                 }
                 on:wheel=move |e| {
                     event_count.update(|n| *n += 1);
                     let _scroll_y = e.delta_y().to_string();
                     #[cfg(feature = "hydrate")]
-                    send_event("wheel", e.client_x(), e.client_y(), Some(("scroll_y".to_string(), _scroll_y)));
+                    queue_event("wheel", e.client_x(), e.client_y(), Some(("scroll_y".to_string(), _scroll_y)), &buffer4, &sender4);
                 }
             >
                 <p style="padding: 20px; text-align: center; color: #666;">
@@ -119,7 +139,75 @@ fn HomePage() -> impl IntoView {
 }
 
 #[cfg(feature = "hydrate")]
-fn send_event(event_type: &str, x: i32, y: i32, extra: Option<(String, String)>) {
+use std::cell::RefCell;
+#[cfg(feature = "hydrate")]
+use std::rc::Rc;
+#[cfg(feature = "hydrate")]
+use js_sys::Function;
+
+/// 创建防抖发送器
+/// 返回：(事件缓冲区, 防抖发送函数)
+#[cfg(feature = "hydrate")]
+fn create_debounced_sender() -> (Rc<RefCell<Vec<MouseEvent>>>, Rc<impl Fn()>) {
+    let event_buffer = Rc::new(RefCell::new(Vec::new()));
+    let timeout_handle = Rc::new(RefCell::new(None::<i32>));
+
+    let buffer_clone = event_buffer.clone();
+    let handle_clone = timeout_handle.clone();
+
+    let debounced_send = move || {
+        // 清除之前的定时器
+        if let Some(handle) = *handle_clone.borrow() {
+            let window = web_sys::window().expect("Window not available");
+            window.clear_timeout_with_handle(handle);
+        }
+
+        // 设置新的定时器（500ms）
+        let buffer = buffer_clone.clone();
+        let handle = handle_clone.clone();
+        let window = web_sys::window().expect("Window not available");
+
+        let callback = Closure::wrap(Box::new(move || {
+            // 发送缓冲区中的所有事件
+            let events = buffer.borrow_mut().drain(..).collect::<Vec<_>>();
+
+            if !events.is_empty() {
+                web_sys::console::log_1(&format!("Sending {} events after debounce", events.len()).into());
+
+                wasm_bindgen_futures::spawn_local(async move {
+                    if let Err(e) = send_events_batch(&events).await {
+                        web_sys::console::log_1(&format!("Failed to send events: {:?}", e).into());
+                    }
+                });
+            }
+        }) as Box<dyn FnMut()>);
+
+        // 将 Closure 转换为 Function
+        let callback_ptr = callback.as_ref().dyn_ref::<Function>().unwrap();
+        let timeout_id = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+            callback_ptr,
+            500,
+        ).expect("Failed to set timeout");
+
+        // 忘记 Closure 以保持其存活（直到定时器触发）
+        callback.forget();
+
+        *handle.borrow_mut() = Some(timeout_id);
+    };
+
+    (event_buffer, Rc::new(debounced_send))
+}
+
+/// 将事件添加到缓冲区并触发防抖
+#[cfg(feature = "hydrate")]
+fn queue_event(
+    event_type: &str,
+    x: i32,
+    y: i32,
+    extra: Option<(String, String)>,
+    buffer: &Rc<RefCell<Vec<MouseEvent>>>,
+    debounced_send: &Rc<impl Fn()>,
+) {
     let timestamp = js_sys::Date::now() as u64;
     let mut mouse_event = MouseEvent {
         event_type: event_type.to_string(),
@@ -139,14 +227,21 @@ fn send_event(event_type: &str, x: i32, y: i32, extra: Option<(String, String)>)
         }
     }
 
-    let event_json = serde_json::to_string(&mouse_event).unwrap();
-    wasm_bindgen_futures::spawn_local(async move {
-        if let Err(e) = send_to_server(&event_json).await {
-            web_sys::console::log_1(&format!("Failed to send event: {:?}", e).into());
-        }
-    });
+    // 添加到缓冲区
+    buffer.borrow_mut().push(mouse_event);
+
+    // 触发防抖
+    debounced_send();
 }
 
+/// 批量发送事件到服务器
+#[cfg(feature = "hydrate")]
+async fn send_events_batch(events: &[MouseEvent]) -> Result<(), JsValue> {
+    let events_json = serde_json::to_string(events).unwrap();
+    send_to_server(&events_json).await
+}
+
+/// 发送 JSON 数据到服务器
 #[cfg(feature = "hydrate")]
 async fn send_to_server(event_json: &str) -> Result<(), JsValue> {
     let opts = RequestInit::new();

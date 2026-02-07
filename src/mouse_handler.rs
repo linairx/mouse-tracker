@@ -20,6 +20,14 @@ impl MouseLogger {
     }
 
     pub async fn log_event(&self, event: &MouseEvent) -> Result<(), Box<dyn std::error::Error>> {
+        self.log_events(&[event.clone()]).await
+    }
+
+    pub async fn log_events(&self, events: &[MouseEvent]) -> Result<(), Box<dyn std::error::Error>> {
+        if events.is_empty() {
+            return Ok(());
+        }
+
         // 获取锁以确保同一时间只有一个写入操作
         let _guard = self._guard.lock().await;
 
@@ -28,8 +36,10 @@ impl MouseLogger {
             .append(true)
             .open(&self.file_path)?;
 
-        let json_line = serde_json::to_string(event)?;
-        writeln!(file, "{}", json_line)?;
+        for event in events {
+            let json_line = serde_json::to_string(event)?;
+            writeln!(file, "{}", json_line)?;
+        }
         file.flush()?;
 
         Ok(())
@@ -40,12 +50,12 @@ pub type AppState = Arc<MouseLogger>;
 
 pub async fn handle_mouse_event(
     axum::extract::State(mouse_logger): axum::extract::State<AppState>,
-    axum::Json(event): axum::Json<MouseEvent>,
+    axum::Json(events): axum::Json<Vec<MouseEvent>>,
 ) -> Result<String, axum::http::StatusCode> {
     mouse_logger
-        .log_event(&event)
+        .log_events(&events)
         .await
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok("Event logged".to_string())
+    Ok(format!("{} events logged", events.len()))
 }
